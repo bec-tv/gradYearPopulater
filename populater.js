@@ -2,6 +2,7 @@
 
 const fetch = require("node-fetch");
 const dotenv = require("dotenv");
+
 var result = dotenv.config();
 
 if(result.error) {
@@ -37,7 +38,19 @@ fetch(`${url}shows/search/advanced/${savedSearch}`)
           console.log(`show ${show.id} - "${show.title}" finished:`);
           console.log(result);
 
-          //console.log(`${show.id},${result.date},${result.beginGrade},${result.endGrade},${result.beginClass},${result.endClass},"${show.title}"`);
+
+          if(process.env.DRY_RUN != false) {
+            fetch(`${url}shows/${show.id}`, {
+              method: 'put',
+              body: JSON.stringify(result),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Basic ${Buffer.from(process.env.CREDENTIALS).toString('base64')}`},
+            })
+            .then(res => res.json())
+            .then(json => console.log(json));
+          }
+          //console.log(`${show.id},${show.eventDate},${result.beginGrade},${result.endGrade},${result.beginClass},${result.endClass},"${show.title}"`);
         }
       });
       //console.log(show);
@@ -90,6 +103,8 @@ const computeGradYears = show => {
         item.value = endClass.toString();
     });
   }
+  else
+    console.log(`ERROR: Failed to process show ${show.id}.  Couldn't get beginGrade or endGrade`);
 
   return show;
 };
