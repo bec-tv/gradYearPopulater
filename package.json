@@ -1,0 +1,17 @@
+{
+  "name": "grad-year-populater",
+  "version": "0.1.0",
+  "description": "Script to populate Grad Year (custom field) in Cablecast Shows",
+  "main": "populater.js",
+  "dependencies": {
+    "dotenv": "^7.0.0",
+    "node-fetch": "^2.3.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Brandon McKenzie - BEC-TV",
+  "license": "MIT",
+  "homepage": "https://github.com/bec-tv/grad-year-populater"
+}
