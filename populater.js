@@ -53,7 +53,7 @@ const getShow = showID => {
     //update Date to be a real Date object not just a date-y string
     show.eventDate = new Date(show.eventDate);
 
-    console.log(show);
+    //console.log(show);
 
     return show;
   });
@@ -61,7 +61,6 @@ const getShow = showID => {
 };
 
 const computeGradYears = show => {
-  var result = null;
   var beginGrade = 0;
   var endGrade = 0;
   var customFields = show.customFields
@@ -80,17 +79,19 @@ const computeGradYears = show => {
     var beginYearsTillGrad = 12 - beginGrade;
     var endYearsTillGrad = 12 - endGrade;
 
-    result = {
-      showID: show.id,
-      date: show.eventDate,
-      beginGrade: beginGrade,
-      endGrade: endGrade,
-      beginClass: eventYear + schoolYearOffset + beginYearsTillGrad,
-      endClass: eventYear + schoolYearOffset + endYearsTillGrad,
-    };
+    var beginClass = eventYear + schoolYearOffset + beginYearsTillGrad;
+    var endClass = eventYear + schoolYearOffset + endYearsTillGrad;
+
+    //update the appropriate custom fields
+    customFields.forEach(item => {
+      if(item.showField == process.env.BEGINING_CLASS)
+        item.value = beginClass.toString();
+      else if(item.showField == process.env.END_CLASS)
+        item.value = endClass.toString();
+    });
   }
 
-  return result;
+  return show;
 };
 
 
