@@ -15,6 +15,9 @@ const credentials = process.env.CREDENTIALS || "";
 const savedSearch = process.env.SAVEDSEARCH;
 const limit = process.env.LIMIT || 10;
 
+if (process.env.VERBOSE === true)
+  console.log("WARNING: Verbose mode is active!");
+
 console.log(`Requesting results from ${url} from saved search ${savedSearch}`)
 
 fetch(`${url}shows/search/advanced/${savedSearch}`)
@@ -36,26 +39,12 @@ fetch(`${url}shows/search/advanced/${savedSearch}`)
           var updatedShow = computeGradYears(show);
 
           console.log(`show ${show.id} - "${show.title}" finished:`);
-          console.log(updatedShow);
 
-          var result = new Object();
-          result.Show = updatedShow;
+          if(process.env.VERBOSE == 'true')
+            console.log(updatedShow);
 
-          if(process.env.DRY_RUN != false) {
-            fetch(`${url}shows/${show.id}`, {
-              method: 'put',
-              body: JSON.stringify(result),
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Basic ${Buffer.from(process.env.CREDENTIALS).toString('base64')}`},
-            })
-            .then(res => res.json())
-            .then(json => {
-              console.log(json);
-              postSuccessToSlack(updatedShow);
-            });
+          updateCablecast(updatedShow);
 
-          }
           //console.log(`${show.id},${show.eventDate},${result.beginGrade},${result.endGrade},${result.beginClass},${result.endClass},"${show.title}"`);
         }
       });
@@ -69,40 +58,36 @@ const getShow = showID => {
   .then((show) => {
     return show;
   });
-  
 };
 
+const eventDate = show => new Date(show.eventDate);
+const beginGrade = show => getCustomField(show, process.env.BEGINING_GRADE).value;
+const endGrade = show => getCustomField(show, process.env.END_GRADE).value;
+const beginClass = show => getCustomField(show, process.env.BEGINING_CLASS).value;
+const endClass = show => getCustomField(show, process.env.END_CLASS).value;
+
+const getCustomField = (show, showFieldId) => show.customFields.find(e => e.showField == showFieldId);
+
 const computeGradYears = show => {
-  var beginGrade = 0;
-  var endGrade = 0;
-  var date = new Date(show.eventDate);
+  var begin = beginGrade(show);
+  var end = endGrade(show);
+  var date = eventDate(show);
 
   var customFields = show.customFields;
 
-  customFields.forEach(item => {
-    if(item.showField == process.env.BEGINING_GRADE)
-      beginGrade = item.value;
-    else if(item.showField == process.env.END_GRADE)
-      endGrade = item.value;
-  });
-
-  if(beginGrade > 0 && endGrade > 0)
+  if(begin > 0 && end > 0)
   {
     var eventYear = date.getFullYear();
     var schoolYearOffset = date.getMonth() >= 7 ? 1 : 0;
-    var beginYearsTillGrad = 12 - beginGrade;
-    var endYearsTillGrad = 12 - endGrade;
+    var beginYearsTillGrad = 12 - begin;
+    var endYearsTillGrad = 12 - end;
 
     var beginClass = eventYear + schoolYearOffset + beginYearsTillGrad;
     var endClass = eventYear + schoolYearOffset + endYearsTillGrad;
 
     //update the appropriate custom fields
-    customFields.forEach(item => {
-      if(item.showField == process.env.BEGINING_CLASS)
-        item.value = beginClass.toString();
-      else if(item.showField == process.env.END_CLASS)
-        item.value = endClass.toString();
-    });
+    getCustomField(show, process.env.BEGINING_CLASS).value = beginClass.toString();
+    getCustomField(show, process.env.END_CLASS).value = endClass.toString();
   }
   else
     console.log(`ERROR: Failed to process show ${show.id}.  Couldn't get beginGrade or endGrade`);
@@ -110,11 +95,34 @@ const computeGradYears = show => {
   return show;
 };
 
+const updateCablecast = show =>
+{
+  var result = new Object();
+  result.Show = show;
+
+  if(process.env.DRY_RUN != false) {
+    fetch(`${url}shows/${show.id}`, {
+      method: 'put',
+      body: JSON.stringify(result),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${Buffer.from(process.env.CREDENTIALS).toString('base64')}`},
+    })
+    .then(res => res.json())
+    .then(json => {
+      if(process.env.VERBOSE == 'true')
+        console.log(json);
+
+      postSuccessToSlack(show);
+    });
+  }
+};
+
 const postSuccessToSlack = show =>
 {
   console.log("Posting success message to Slack...");
 
-  var message = `Updated *Grad Year* fields for show <${process.env.URL}/Cablecast/app/index.html#/shows/${show.id}|${show.id}>.`;
+  var message = `Updated *Grad Year* fields for show <${process.env.URL}/Cablecast/app/index.html#/shows/${show.id}/edit|${show.id}>.  EventDate=${eventDate(show).toLocaleDateString()}, Grades=[${beginGrade(show)}-${endGrade(show)}] Classes=[${beginClass(show)}-${endClass(show)}]`;
 
   postToSlack(message);
 }
@@ -125,8 +133,6 @@ const postToSlack = message =>
     console.log("Webhook undefined, skipping slack notification");
     return;
   }
-
-  console.log("Posting update to Slack...");
 
   var messageBody = {
     username: "gradYearPopulater",
@@ -139,10 +145,15 @@ const postToSlack = message =>
       body: JSON.stringify(messageBody),
       headers: {'Content-Type': 'application/json'}})
     .then(res => {
+      var showResponse = (process.env.VERBOSE == 'true');
+
       if(res.status != 200) {
         console.log("ERROR: Unsuccessful response from Slack Webhook");
-        console.log(res);
+        showResponse = true;
       }
+
+      if(showResponse)
+        console.log(res);
     });
 };
 
