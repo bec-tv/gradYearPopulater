@@ -32,14 +32,12 @@ fetch(`${url}shows/search/advanced/${savedSearch}`)
           console.log(`Show ${show.id} has no EventDate!, skipping!`);
         else
         {
+          var result = computeGradYears(show);
 
-          var data = getGrades(show);
-          var result = computeYears(data);
+          console.log(`show ${show.id} - "${show.title}" finished:`);
+          console.log(result);
 
-          //console.log(`show ${show.id} - "${show.title}" finished:`);
-          //console.log(years);
-
-          console.log(`${show.id},${result.date},${result.beginGrade},${result.endGrade},${result.beginClass},${result.endClass},"${show.title}"`);
+          //console.log(`${show.id},${result.date},${result.beginGrade},${result.endGrade},${result.beginClass},${result.endClass},"${show.title}"`);
         }
       });
       //console.log(show);
@@ -52,13 +50,18 @@ const getShow = showID => {
   .then((res) => { return res.json(); })
   .then((json) => { return json.show; })
   .then((show) => {
-    //console.log(show);
+    //update Date to be a real Date object not just a date-y string
+    show.eventDate = new Date(show.eventDate);
+
+    console.log(show);
+
     return show;
   });
   
 };
 
-const getGrades = show => {
+const computeGradYears = show => {
+  var result = null;
   var beginGrade = 0;
   var endGrade = 0;
   var customFields = show.customFields
@@ -70,38 +73,26 @@ const getGrades = show => {
       endGrade = item.value;
   });
 
-  var result = {
-    showID: show.id,
-    date: show.eventDate,
-    beginGrade: beginGrade,
-    endGrade: endGrade,
-  };
+  if(beginGrade > 0 && endGrade > 0)
+  {
+    var eventYear = show.eventDate.getFullYear();
+    var schoolYearOffset = show.eventDate.getMonth() >= 7 ? 1 : 0;
+    var beginYearsTillGrad = 12 - beginGrade;
+    var endYearsTillGrad = 12 - endGrade;
 
-  //console.log(`getGrades():\tShow=${show.id}, Date=${show.eventDate} Begin=${beginGrade}, End=${endGrade}`);
-
-  return result;
-};
-
-const computeYears = data => {
-
-  var eventYear = new Date(data.date).getFullYear();
-  var schoolYearOffset = new Date(data.date).getMonth() >= 7 ? 1 : 0;
-  var beginYearsTillGrad = 12 - data.beginGrade;
-  var endYearsTillGrad = 12 - data.endGrade;
-
-  var result = {
-    showID: data.showID,
-    date: data.date,
-    beginGrade: data.beginGrade,
-    endGrade: data.endGrade,
-    beginClass: eventYear + schoolYearOffset + beginYearsTillGrad,
-    endClass: eventYear + schoolYearOffset + endYearsTillGrad,
-  };
-
-  //console.log(`computeYears():\tShow=${data.showID}, Date=${data.date} Begin=[grade=${data.beginGrade},class=${result.beginClass}, End=[grade=${data.endGrade},class=${result.endClass}]`);
+    result = {
+      showID: show.id,
+      date: show.eventDate,
+      beginGrade: beginGrade,
+      endGrade: endGrade,
+      beginClass: eventYear + schoolYearOffset + beginYearsTillGrad,
+      endClass: eventYear + schoolYearOffset + endYearsTillGrad,
+    };
+  }
 
   return result;
 };
+
 
 /*
 ---- VBScript to calcualte grad years from old ClassSalute plugin ---
