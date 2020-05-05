@@ -33,7 +33,7 @@ fetch(`${url}shows/search/advanced/${savedSearch}`)
       getShow(shows[i])
       .then((show) => {
         if(show.eventDate === null)
-          console.log(`Show ${show.id} has no EventDate!, skipping!`);
+          logError(`Show ${show.id} has no EventDate!, skipping!`);
         else
         {
           var updatedShow = computeGradYears(show);
@@ -90,13 +90,12 @@ const computeGradYears = show => {
     getCustomField(show, process.env.END_CLASS).value = endClass.toString();
   }
   else
-    console.log(`ERROR: Failed to process show ${show.id}.  Couldn't get beginGrade or endGrade`);
+    logError(`ERROR: Failed to process show ${show.id}.  Couldn't get beginGrade or endGrade`);
 
   return show;
 };
 
-const updateCablecast = show =>
-{
+const updateCablecast = show => {
   var result = new Object();
   result.Show = show;
 
@@ -118,8 +117,12 @@ const updateCablecast = show =>
   }
 };
 
-const postSuccessToSlack = show =>
-{
+const logError = message => {
+  console.log(message);
+  postToSlack(message);
+};
+
+const postSuccessToSlack = show => {
   console.log("Posting success message to Slack...");
 
   var message = `Updated *Grad Year* fields for show <${process.env.URL}/Cablecast/app/index.html#/shows/${show.id}/edit|${show.id}>.  EventDate=${eventDate(show).toLocaleDateString()}, Grades=[${beginGrade(show)}-${endGrade(show)}] Classes=[${beginClass(show)}-${endClass(show)}]`;
@@ -127,8 +130,7 @@ const postSuccessToSlack = show =>
   postToSlack(message);
 }
 
-const postToSlack = message =>
-{
+const postToSlack = message => {
   if(!process.env.SLACK_WEBHOOK) {
     console.log("Webhook undefined, skipping slack notification");
     return;
