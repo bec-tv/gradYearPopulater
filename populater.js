@@ -24,7 +24,7 @@ fetch(`${url}shows/search/advanced/${savedSearch}`)
 		var effective_limit = Math.min(limit, shows.length);
 		console.log(`Got ${shows.length} shows, populating grad year for first ${effective_limit} results`);
   
-    console.log('showID,eventDate,beginGrade,endGrade,beginClass,endClass,title')
+    //console.log('showID,eventDate,beginGrade,endGrade,beginClass,endClass,title')
 
   	for(var i = 0; i < effective_limit; i++) {
       getShow(shows[i])
@@ -33,11 +33,13 @@ fetch(`${url}shows/search/advanced/${savedSearch}`)
           console.log(`Show ${show.id} has no EventDate!, skipping!`);
         else
         {
-          var result = computeGradYears(show);
+          var updatedShow = computeGradYears(show);
 
           console.log(`show ${show.id} - "${show.title}" finished:`);
-          console.log(result);
+          console.log(updatedShow);
 
+          var result = new Object();
+          result.Show = updatedShow;
 
           if(process.env.DRY_RUN != false) {
             fetch(`${url}shows/${show.id}`, {
@@ -48,13 +50,15 @@ fetch(`${url}shows/search/advanced/${savedSearch}`)
                 'Authorization': `Basic ${Buffer.from(process.env.CREDENTIALS).toString('base64')}`},
             })
             .then(res => res.json())
-            .then(json => console.log(json));
+            .then(json => {
+              console.log(json);
+              postSuccessToSlack(updatedShow);
+            });
+
           }
           //console.log(`${show.id},${show.eventDate},${result.beginGrade},${result.endGrade},${result.beginClass},${result.endClass},"${show.title}"`);
         }
       });
-      //console.log(show);
-      //.then((show) => getGrades(show.id, show.customFields));
   	}
   });
 
@@ -63,11 +67,6 @@ const getShow = showID => {
   .then((res) => { return res.json(); })
   .then((json) => { return json.show; })
   .then((show) => {
-    //update Date to be a real Date object not just a date-y string
-    show.eventDate = new Date(show.eventDate);
-
-    //console.log(show);
-
     return show;
   });
   
@@ -76,7 +75,9 @@ const getShow = showID => {
 const computeGradYears = show => {
   var beginGrade = 0;
   var endGrade = 0;
-  var customFields = show.customFields
+  var date = new Date(show.eventDate);
+
+  var customFields = show.customFields;
 
   customFields.forEach(item => {
     if(item.showField == process.env.BEGINING_GRADE)
@@ -87,8 +88,8 @@ const computeGradYears = show => {
 
   if(beginGrade > 0 && endGrade > 0)
   {
-    var eventYear = show.eventDate.getFullYear();
-    var schoolYearOffset = show.eventDate.getMonth() >= 7 ? 1 : 0;
+    var eventYear = date.getFullYear();
+    var schoolYearOffset = date.getMonth() >= 7 ? 1 : 0;
     var beginYearsTillGrad = 12 - beginGrade;
     var endYearsTillGrad = 12 - endGrade;
 
@@ -109,6 +110,41 @@ const computeGradYears = show => {
   return show;
 };
 
+const postSuccessToSlack = show =>
+{
+  console.log("Posting success message to Slack...");
+
+  var message = `Updated *Grad Year* fields for show <${process.env.URL}/Cablecast/app/index.html#/shows/${show.id}|${show.id}>.`;
+
+  postToSlack(message);
+}
+
+const postToSlack = message =>
+{
+  if(!process.env.SLACK_WEBHOOK) {
+    console.log("Webhook undefined, skipping slack notification");
+    return;
+  }
+
+  console.log("Posting update to Slack...");
+
+  var messageBody = {
+    username: "gradYearPopulater",
+    text: message,
+    icon_emoji: ":mortar_board:"
+  };
+
+  fetch(process.env.SLACK_WEBHOOK, {
+      method: 'post',
+      body: JSON.stringify(messageBody),
+      headers: {'Content-Type': 'application/json'}})
+    .then(res => {
+      if(res.status != 200) {
+        console.log("ERROR: Unsuccessful response from Slack Webhook");
+        console.log(res);
+      }
+    });
+};
 
 /*
 ---- VBScript to calcualte grad years from old ClassSalute plugin ---
