@@ -20,7 +20,14 @@ if (process.env.VERBOSE === true)
 
 console.log(`Requesting results from ${url} from saved search ${savedSearch}`)
 
-fetch(`${url}shows/search/advanced/${savedSearch}`)
+fetch(`${url}shows/search/advanced/${savedSearch}`, 
+  {
+    method: 'get',
+    headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${Buffer.from(process.env.CREDENTIALS).toString('base64')}`
+    }  
+  })
 	.then(res => res.json())
 	.then(json => {
 		var shows = json.savedShowSearch.results;
@@ -36,16 +43,24 @@ fetch(`${url}shows/search/advanced/${savedSearch}`)
           logError(`Show ${show.id} has no EventDate!, skipping!`);
         else
         {
-          var updatedShow = computeGradYears(show);
+          var showValidated = ensureCustomFieldIsEmpty(show, getCustomField(show, process.env.BEGINING_CLASS));
 
-          console.log(`show ${show.id} - "${show.title}" finished:`);
+          if(showValidated)
+            showValidated = ensureCustomFieldIsEmpty(show, getCustomField(show, process.env.END_CLASS));
 
-          if(process.env.VERBOSE == 'true')
-            console.log(updatedShow);
+          if(showValidated)
+          {
+            var updatedShow = computeGradYears(show);
 
-          updateCablecast(updatedShow);
+            console.log(`show ${show.id} - "${show.title}" finished:`);
 
-          //console.log(`${show.id},${show.eventDate},${result.beginGrade},${result.endGrade},${result.beginClass},${result.endClass},"${show.title}"`);
+            if(process.env.VERBOSE == 'true')
+              console.log(updatedShow);
+
+            updateCablecast(updatedShow);
+
+            //console.log(`${show.id},${show.eventDate},${result.beginGrade},${result.endGrade},${result.beginClass},${result.endClass},"${show.title}"`);
+          }
         }
       });
   	}
@@ -67,6 +82,26 @@ const beginClass = show => getCustomField(show, process.env.BEGINING_CLASS).valu
 const endClass = show => getCustomField(show, process.env.END_CLASS).value;
 
 const getCustomField = (show, showFieldId) => show.customFields.find(e => e.showField == showFieldId);
+
+const ensureCustomFieldIsEmpty = (show, field) => {
+  var result = false;
+
+  if(process.env.VERBOSE == 'true') {
+    console.log(`ensureCustomFieldIsEmpty: value=`);
+    console.log(field);
+  }
+
+  if(!field)
+    console.log(`WARNING: Show ${show.id} target custom field is not null`);
+  else if(field.value == null)
+    result = true;
+  else if(field.value !== '')
+    console.log(`WARNING: Show ${show.id} target custom field has a value set!`);
+  else
+    result = true;
+
+  return result;
+};
 
 const computeGradYears = show => {
   var begin = beginGrade(show);
