@@ -67,7 +67,12 @@ fetch(`${url}shows/search/advanced/${savedSearch}`,
   });
 
 const getShow = showID => {
-  return fetch(`${url}shows/${showID}`)
+  return fetch(`${url}shows/${showID}`, {
+    method: 'get',
+    headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${Buffer.from(process.env.CREDENTIALS).toString('base64')}`
+    }})
   .then((res) => { return res.json(); })
   .then((json) => { return json.show; })
   .then((show) => {
